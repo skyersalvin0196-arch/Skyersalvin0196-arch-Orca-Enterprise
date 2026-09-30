@@ -48,7 +48,7 @@ function requireOwner(req,res,next){if(req.admin?.role!=="owner")return res.stat
 app.get("/health",async(req,res)=>{
   let database="not_configured";
   if(pool){try{await ensureDb();await pool.query("SELECT 1");database="connected"}catch(e){database="error"}}
-  res.json({status:"ok",app:"Orca Enterprise",version:"1.3.0",database});
+  res.json({status:"ok",app:"Orca Enterprise",version:"1.4.1",database});
 });
 app.get("/api/services",(req,res)=>res.json([
  {id:"detailing",name:"Mobile Detailing",description:"Professional mobile vehicle care.",items:["Standard Car Wash","Interior Cleaning","Engine Wash","Wax & Polish","Undercarriage Wash","Headlight Restoration"]},
@@ -109,7 +109,13 @@ app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
 });
 app.post("/api/bookings",async(req,res)=>{
   const {service,customerName,phone,email,address,scheduledAt,notes}=req.body||{};
+  const allowedServices=["Mobile Detailing","Residential Cleaning","Commercial Cleaning","Transportation"];
   if(!service||!customerName||!phone)return res.status(400).json({error:"Service, customer name and phone are required"});
+  if(!allowedServices.includes(String(service)))return res.status(400).json({error:"Please select a valid Orca Enterprise service"});
+  if(String(customerName).trim().length<2||String(customerName).trim().length>100)return res.status(400).json({error:"Full name must be 2-100 characters"});
+  if(String(phone).trim().length<7||String(phone).trim().length>30)return res.status(400).json({error:"Please enter a valid phone number"});
+  if(email&&String(email).length>254)return res.status(400).json({error:"Email address is too long"});
+  if(notes&&String(notes).length>2000)return res.status(400).json({error:"Notes are limited to 2000 characters"});
   if(pool){try{await ensureDb();const r=await pool.query("INSERT INTO bookings(service,customer_name,phone,email,address,scheduled_at,notes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",[service,customerName,phone,email||null,address||null,scheduledAt||null,notes||null]);return res.status(201).json(r.rows[0])}catch(e){return res.status(500).json({error:"Booking could not be saved. Please try again."})}}
   res.status(503).json({error:"Booking database is temporarily unavailable"});
 });
