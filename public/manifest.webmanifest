@@ -1,1 +1,19 @@
-{"name":"Orca Enterprise","short_name":"Orca","start_url":"/","display":"standalone","background_color":"#050914","theme_color":"#07111f","description":"Orca Enterprise services and customer booking app","icons":[]}
+{
+  "name": "Orca Enterprise",
+  "short_name": "Orca",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050914",
+  "theme_color": "#07111f",
+  "description": "Orca Enterprise services and customer booking app",
+  "icons": [
+    {
+      "src": "/icons/orca.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
