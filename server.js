@@ -83,7 +83,7 @@ app.post("/api/admin/login",async(req,res)=>{
     const username=String(req.body.username||"").trim();
     const password=String(req.body.password||"");
     const r=await pool.query("SELECT id,username,password_hash,role FROM admin_users WHERE username=$1",[username]);
-    if(!r.rowCount||!(await bcrypt.compare(password,r.rows[0].password_hash)))return res.status(401).json({error:"Incorrect username or password"});
+    if(!r.rowCount||r.rows[0].role!=="owner"||!(await bcrypt.compare(password,r.rows[0].password_hash)))return res.status(401).json({error:"Incorrect creator username or password"});
     res.json({token:createSession(r.rows[0]),user:{username:r.rows[0].username,role:r.rows[0].role}});
   }catch(e){res.status(500).json({error:"Unable to sign in"})}
 });
