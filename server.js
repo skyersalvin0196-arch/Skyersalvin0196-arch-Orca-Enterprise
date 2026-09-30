@@ -45,7 +45,7 @@ function currentAdmin(req){
   if(!s||s.expires<Date.now()){if(token)sessions.delete(token);return null}
   return s;
 }
-function requireAdmin(req,res,next){const user=currentAdmin(req);if(!user)return res.status(401).json({error:"Admin authentication required"});req.admin=user;next()}
+function requireAdmin(req,res,next){const user=currentAdmin(req);if(!user||user.role!=="owner")return res.status(401).json({error:"Creator authentication required"});req.admin=user;next()}
 function requireOwner(req,res,next){if(req.admin?.role!=="owner")return res.status(403).json({error:"Owner access required"});next()}
 
 app.get("/health",async(req,res)=>{
