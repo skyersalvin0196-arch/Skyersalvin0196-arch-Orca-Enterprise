@@ -1,12 +1,12 @@
 {
   "name": "orca-enterprise",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "Orca Enterprise service platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "pwa:check": "node -e \"console.log('Orca Enterprise PWA metadata ready')\"
+    "pwa:check": "node -e \"console.log('Orca Enterprise PWA metadata ready')\""
   },
   "engines": {
     "node": ">=20"
