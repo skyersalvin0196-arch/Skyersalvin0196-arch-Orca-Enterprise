@@ -9,6 +9,7 @@ const ADMIN_USERNAME=process.env.ADMIN_USERNAME||"admin";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 const PUBLIC_APP_URL=process.env.PUBLIC_APP_URL||"";
 const STRIPE_SECRET_KEY=process.env.STRIPE_SECRET_KEY||"";
+const LYNK_PAYMENT_URL=process.env.LYNK_PAYMENT_URL||"https://abr.ge/nfaa6gu";
 const sessions=new Map();
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
@@ -67,7 +68,7 @@ function requireOwner(req,res,next){if(req.admin?.role!=="owner")return res.stat
 app.get("/health",async(req,res)=>{
   let database="not_configured";
   if(pool){try{await ensureDb();await pool.query("SELECT 1");database="connected"}catch(e){database="error"}}
-  res.json({status:"ok",app:"Orca Enterprise",version:"1.4.1",database});
+  res.json({status:"ok",app:"Orca Enterprise",version:"1.5.0",database,payment:"lynk"});
 });
 app.get("/api/services",(req,res)=>res.json([
  {id:"detailing",name:"Mobile Detailing",description:"Professional mobile vehicle care.",items:["Standard Car Wash","Interior Cleaning","Engine Wash","Wax & Polish","Undercarriage Wash","Headlight Restoration"]},
@@ -110,11 +111,15 @@ async function createStripeCheckout(booking){
 }
 app.get("/api/bookings/:id/payment-info",async(req,res)=>{
   if(!pool)return res.status(503).json({error:"Database is not configured"});
-  try{await ensureDb();const r=await pool.query("SELECT id,service,customer_name,phone,amount_jmd,payment_status,status FROM bookings WHERE id=$1 AND phone=$2",[req.params.id,String(req.query.phone||"").trim()]);if(!r.rowCount)return res.status(404).json({error:"Booking not found. Check the booking number and phone number."});const b=r.rows[0];res.json({id:b.id,service:b.service,customerName:b.customer_name,amountJmd:b.amount_jmd,paymentStatus:b.payment_status,status:b.status,paymentAvailable:Boolean(STRIPE_SECRET_KEY&&Number(b.amount_jmd)>0)});}catch(e){res.status(500).json({error:"Unable to find booking"})}
+  try{await ensureDb();const r=await pool.query("SELECT id,service,customer_name,phone,amount_jmd,payment_status,status FROM bookings WHERE id=$1 AND phone=$2",[req.params.id,String(req.query.phone||"").trim()]);if(!r.rowCount)return res.status(404).json({error:"Booking not found. Check the booking number and phone number."});const b=r.rows[0];res.json({id:b.id,service:b.service,customerName:b.customer_name,amountJmd:b.amount_jmd,paymentStatus:b.payment_status,status:b.status,paymentAvailable:Boolean(LYNK_PAYMENT_URL&&Number(b.amount_jmd)>0)});}catch(e){res.status(500).json({error:"Unable to find booking"})}
 });
 app.post("/api/bookings/:id/pay",async(req,res)=>{
   if(!pool)return res.status(503).json({error:"Database is not configured"});
-  try{await ensureDb();const r=await pool.query("SELECT * FROM bookings WHERE id=$1 AND phone=$2",[req.params.id,String(req.body.phone||"").trim()]);if(!r.rowCount)return res.status(404).json({error:"Booking not found"});const b=r.rows[0];if(b.payment_status==="paid")return res.json({paid:true,message:"This booking is already paid."});const checkout=await createStripeCheckout(b);if(checkout.error)return res.status(400).json({error:checkout.error});res.json(checkout);}catch(e){res.status(500).json({error:"Unable to start payment"})}
+  try{await ensureDb();const r=await pool.query("SELECT * FROM bookings WHERE id=$1 AND phone=$2",[req.params.id,String(req.body.phone||"").trim()]);if(!r.rowCount)return res.status(404).json({error:"Booking not found"});const b=r.rows[0];if(b.payment_status==="paid")return res.json({paid:true,message:"This booking is already paid."});const amount=Number(b.amount_jmd||0);if(!LYNK_PAYMENT_URL||!Number.isFinite(amount)||amount<=0)return res.status(400).json({error:"Orca has not set the payment amount for this booking yet"});await pool.query("UPDATE bookings SET payment_status='pending' WHERE id=$1",[b.id]);res.json({url:LYNK_PAYMENT_URL,paymentMethod:"Lynk",bookingId:b.id,amountJmd:amount});}catch(e){res.status(500).json({error:"Unable to start Lynk payment"})}
+});
+app.post("/api/bookings/:id/lynk-paid",async(req,res)=>{
+  if(!pool)return res.status(503).json({error:"Database is not configured"});
+  try{await ensureDb();const r=await pool.query("SELECT id,payment_status FROM bookings WHERE id=$1 AND phone=$2",[req.params.id,String(req.body.phone||"").trim()]);if(!r.rowCount)return res.status(404).json({error:"Booking not found"});if(r.rows[0].payment_status==="paid")return res.json({paid:true,message:"This booking is already paid."});await pool.query("UPDATE bookings SET payment_status='pending_verification' WHERE id=$1",[r.rows[0].id]);res.json({ok:true,paymentStatus:"pending_verification",message:"Payment submitted for Lynk verification."});}catch(e){res.status(500).json({error:"Unable to update payment status"})}
 });
 app.get("/api/payments/confirm",async(req,res)=>{
   if(!pool||!STRIPE_SECRET_KEY)return res.status(503).json({error:"Online payments are not configured"});
