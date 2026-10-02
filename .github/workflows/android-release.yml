@@ -2,6 +2,12 @@ name: Build Orca Enterprise Android
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'capacitor.config.ts'
+      - 'android-web/**'
+      - '.github/workflows/android-release.yml'
+      - 'package.json'
 
 jobs:
   build:
