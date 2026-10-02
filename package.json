@@ -1,12 +1,14 @@
 {
   "name": "orca-enterprise",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "description": "Orca Enterprise service platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "pwa:check": "node -e \"console.log('Orca Enterprise PWA metadata ready')\""
+    "pwa:check": "node -e \"console.log('Orca Enterprise PWA metadata ready')\"",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
   },
   "engines": {
     "node": ">=20"
@@ -14,6 +16,11 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "@capacitor/core": "^7.4.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/android": "^7.4.4"
   }
 }
