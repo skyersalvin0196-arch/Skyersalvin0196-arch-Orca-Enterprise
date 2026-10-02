@@ -58,23 +58,33 @@ jobs:
           KEY_PASSWORD_VALUE: ${{ secrets.ORCA_KEY_PASSWORD }}
         working-directory: android
         run: |
+          test -n "$KS_PASSWORD"
+          test -n "$KEY_ALIAS_VALUE"
+          test -n "$KEY_PASSWORD_VALUE"
           python3 - <<'PY'
           from pathlib import Path
-          p=Path("app/build.gradle")
-          s=p.read_text()
-          s=s.replace("android {", """android {
-    signingConfigs {
-        release {
-            storeFile file("orca-release.keystore")
-            storePassword System.getenv("KS_PASSWORD")
-            keyAlias System.getenv("KEY_ALIAS_VALUE")
-            keyPassword System.getenv("KEY_PASSWORD_VALUE")
-        }
-    }""", 1)
-          s=s.replace("buildTypes {", """buildTypes {
-        release {
-            signingConfig signingConfigs.release
-        }""", 1)
+          import re
+          p = Path("app/build.gradle")
+          s = p.read_text()
+          signing = '''    signingConfigs {
+          release {
+              storeFile file("orca-release.keystore")
+              storePassword System.getenv("KS_PASSWORD")
+              keyAlias System.getenv("KEY_ALIAS_VALUE")
+              keyPassword System.getenv("KEY_PASSWORD_VALUE")
+          }
+      }
+          '''
+          if "signingConfigs {" not in s:
+              s = s.replace("android {", "android {\n" + signing, 1)
+          if "signingConfig signingConfigs.release" not in s:
+              s, n = re.subn(
+                  r'(buildTypes\s*\{\s*release\s*\{)',
+                  r'\1\n            signingConfig signingConfigs.release',
+                  s, count=1
+              )
+              if n != 1:
+                  raise SystemExit("Could not locate the Android release build type")
           p.write_text(s)
           PY
 
