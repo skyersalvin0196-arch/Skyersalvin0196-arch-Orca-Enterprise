@@ -43,13 +43,57 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build unsigned release AAB
+      - name: Decode Android signing keystore
+        env:
+          KS_B64: ${{ secrets.ORCA_KEYSTORE_BASE64 }}
+        working-directory: android
+        run: |
+          test -n "$KS_B64"
+          printf '%s' "$KS_B64" | base64 --decode > orca-release.keystore
+
+      - name: Configure Android release signing
+        env:
+          KS_PASSWORD: ${{ secrets.ORCA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS_VALUE: ${{ secrets.ORCA_KEY_ALIAS }}
+          KEY_PASSWORD_VALUE: ${{ secrets.ORCA_KEY_PASSWORD }}
+        working-directory: android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/build.gradle")
+          s=p.read_text()
+          s=s.replace("android {", """android {
+    signingConfigs {
+        release {
+            storeFile file("orca-release.keystore")
+            storePassword System.getenv("KS_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS_VALUE")
+            keyPassword System.getenv("KEY_PASSWORD_VALUE")
+        }
+    }""", 1)
+          s=s.replace("buildTypes {", """buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }""", 1)
+          p.write_text(s)
+          PY
+
+      - name: Build signed release AAB
+        env:
+          KS_PASSWORD: ${{ secrets.ORCA_KEYSTORE_PASSWORD }}
+          KEY_ALIAS_VALUE: ${{ secrets.ORCA_KEY_ALIAS }}
+          KEY_PASSWORD_VALUE: ${{ secrets.ORCA_KEY_PASSWORD }}
         working-directory: android
         run: ./gradlew bundleRelease
 
-      - name: Upload AAB
+      - name: Upload signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: orca-enterprise-unsigned-aab
+          name: orca-enterprise-signed-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+      - name: Remove signing keystore
+        if: always()
+        working-directory: android
+        run: rm -f orca-release.keystore
