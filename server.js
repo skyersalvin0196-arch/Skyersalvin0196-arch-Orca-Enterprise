@@ -20,6 +20,30 @@ app.get("/creator",(req,res)=>res.sendFile(require("path").join(__dirname,"publi
 app.get("/install",(req,res)=>res.sendFile(require("path").join(__dirname,"public","install.html")));
 app.get("/staff",(req,res)=>res.sendFile(require("path").join(__dirname,"public","staff.html")));
 
+async function ensureBookingsDb(){
+  if(!pool)throw new Error("Database is not configured");
+  await pool.query(`CREATE TABLE IF NOT EXISTS bookings(
+    id SERIAL PRIMARY KEY, service TEXT NOT NULL, customer_name TEXT NOT NULL, phone TEXT NOT NULL,
+    email TEXT, address TEXT, scheduled_at TEXT, notes TEXT, status TEXT NOT NULL DEFAULT 'New',
+    amount_jmd NUMERIC(12,2), payment_status TEXT NOT NULL DEFAULT 'unpaid', stripe_session_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+  const migrations=[
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS email TEXT",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS address TEXT",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS scheduled_at TEXT",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS notes TEXT",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'New'",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS amount_jmd NUMERIC(12,2)",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid'",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS stripe_session_id TEXT",
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()"
+  ];
+  for(const sql of migrations)await pool.query(sql);
+  await pool.query("UPDATE bookings SET status='New' WHERE status IS NULL");
+  await pool.query("UPDATE bookings SET payment_status='unpaid' WHERE payment_status IS NULL");
+}
+
 async function ensureDb(){
   if(!pool)return;
   await pool.query(`CREATE TABLE IF NOT EXISTS bookings(
@@ -191,7 +215,31 @@ app.post("/api/bookings",async(req,res)=>{
   if(String(phone).trim().length<7||String(phone).trim().length>30)return res.status(400).json({error:"Please enter a valid phone number"});
   if(email&&String(email).length>254)return res.status(400).json({error:"Email address is too long"});
   if(notes&&String(notes).length>2000)return res.status(400).json({error:"Notes are limited to 2000 characters"});
-  if(pool){try{await ensureDb();const r=await pool.query("INSERT INTO bookings(service,customer_name,phone,email,address,scheduled_at,notes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",[service,customerName,phone,email||null,address||null,scheduledAt||null,notes||null]);return res.status(201).json(r.rows[0])}catch(e){return res.status(500).json({error:"Booking could not be saved. Please try again."})}}
+  if(pool){
+    try{
+      await ensureBookingsDb();
+      const values=[
+        String(service).trim(),
+        String(customerName).trim(),
+        String(phone).trim(),
+        email?String(email).trim():null,
+        address?String(address).trim():null,
+        scheduledAt?String(scheduledAt).trim():null,
+        notes?String(notes).trim():null
+      ];
+      const r=await pool.query(
+        "INSERT INTO bookings(service,customer_name,phone,email,address,scheduled_at,notes,status,payment_status) VALUES($1,$2,$3,$4,$5,$6,$7,'New','unpaid') RETURNING *",
+        values
+      );
+      return res.status(201).json(r.rows[0]);
+    }catch(e){
+      console.error("BOOKING_SAVE_ERROR",{
+        code:e.code,message:e.message,detail:e.detail,hint:e.hint,
+        table:e.table,column:e.column,constraint:e.constraint
+      });
+      return res.status(500).json({error:"Booking could not be saved. Please try again.",code:"BOOKING_SAVE_ERROR"});
+    }
+  }
   res.status(503).json({error:"Booking database is temporarily unavailable"});
 });
 app.listen(port,()=>console.log("Orca Enterprise listening on "+port));
