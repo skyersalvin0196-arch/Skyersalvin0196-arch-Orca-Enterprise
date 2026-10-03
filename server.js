@@ -4,7 +4,7 @@ const bcrypt=require("bcryptjs");
 const {Pool}=require("pg");
 const app=express();
 const port=process.env.PORT||3000;
-const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==="production"?{rejectUnauthorized:false}:false}):null;
+const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.DATABASE_SSL==="true"?{rejectUnauthorized:false}:false}):null;
 const ADMIN_USERNAME=process.env.ADMIN_USERNAME||"admin";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 const PUBLIC_APP_URL=process.env.PUBLIC_APP_URL||"";
