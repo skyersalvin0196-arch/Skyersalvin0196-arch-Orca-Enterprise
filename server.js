@@ -73,8 +73,8 @@ async function ensureDb(){
     const hash=await bcrypt.hash(ADMIN_PASSWORD,12);
     if(!existing.rowCount){
       await pool.query("INSERT INTO admin_users(username,password_hash,role) VALUES($1,$2,'owner')",[ADMIN_USERNAME,hash]);
-    }else if(existing.rows[0].role==="owner" && !(await bcrypt.compare(ADMIN_PASSWORD,existing.rows[0].password_hash))){
-      await pool.query("UPDATE admin_users SET password_hash=$1 WHERE id=$2",[hash,existing.rows[0].id]);
+    }else if(!(await bcrypt.compare(ADMIN_PASSWORD,existing.rows[0].password_hash)) || existing.rows[0].role!=="owner"){
+      await pool.query("UPDATE admin_users SET password_hash=$1,role='owner' WHERE id=$2",[hash,existing.rows[0].id]);
       console.log("ADMIN_PASSWORD_SYNCED");
     }
   }
