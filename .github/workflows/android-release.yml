@@ -99,15 +99,15 @@ jobs:
               s = s.replace("android {", "android {" + signing, 1)
           if "signingConfig signingConfigs.release" not in s:
               s, n = re.subn(
-                  r'(buildTypes\s*\{\s*release\s*\{)',
-                  r'\1\n        signingConfig signingConfigs.release',
+                  r'(buildTypes\\s*\\{\\s*release\\s*\\{)',
+                  r'\\1\\n        signingConfig signingConfigs.release',
                   s, count=1
               )
               if n != 1:
                   raise SystemExit("Could not locate Android release build type")
           p.write_text(s)
           PY
-          grep -n "signingConfigs\|signingConfig signingConfigs.release" app/build.gradle
+          grep -n "signingConfigs\\|signingConfig signingConfigs.release" app/build.gradle
 
       - name: Build signed release AAB
         env:
