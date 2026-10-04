@@ -202,8 +202,10 @@ app.get("/api/bookings",requireAdmin,async(req,res)=>{
 });
 app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
   if(!pool)return res.status(503).json({error:"Database is not configured"});
-  const status=String(req.body.status||"").trim();
-  if(!["New","Confirmed","Completed","Cancelled"].includes(status))return res.status(400).json({error:"Invalid status"});
+  const rawStatus=String(req.body.status||"").trim();
+  const statusMap={new:"New",confirmed:"Confirmed",completed:"Completed",cancelled:"Cancelled"};
+  const status=statusMap[rawStatus.toLowerCase()];
+  if(!status)return res.status(400).json({error:"Invalid status. Use New, Confirmed, Completed or Cancelled."});
   const amount=req.body.amountJmd===null||req.body.amountJmd===""?null:Number(req.body.amountJmd);
   if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>100000000))return res.status(400).json({error:"Invalid payment amount"});
   try{const r=await pool.query("UPDATE bookings SET status=$1,amount_jmd=$2 WHERE id=$3 RETURNING *",[status,amount,req.params.id]);if(!r.rowCount)return res.status(404).json({error:"Booking not found"});res.json(r.rows[0])}
