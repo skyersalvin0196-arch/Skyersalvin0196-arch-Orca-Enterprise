@@ -206,10 +206,25 @@ app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
   const statusMap={new:"New",confirmed:"Confirmed",completed:"Completed",cancelled:"Cancelled"};
   const status=statusMap[rawStatus.toLowerCase()];
   if(!status)return res.status(400).json({error:"Invalid status. Use New, Confirmed, Completed or Cancelled."});
-  const amount=req.body.amountJmd===null||req.body.amountJmd===""?null:Number(req.body.amountJmd);
-  if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>100000000))return res.status(400).json({error:"Invalid payment amount"});
-  try{const r=await pool.query("UPDATE bookings SET status=$1,amount_jmd=$2 WHERE id=$3 RETURNING *",[status,amount,req.params.id]);if(!r.rowCount)return res.status(404).json({error:"Booking not found"});res.json(r.rows[0])}
-  catch(e){res.status(500).json({error:"Unable to update booking"})}
+  const hasAmount=Object.prototype.hasOwnProperty.call(req.body,"amountJmd");
+  let amount;
+  if(hasAmount){
+    amount=req.body.amountJmd===null||req.body.amountJmd===""?null:Number(req.body.amountJmd);
+    if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>100000000))return res.status(400).json({error:"Invalid payment amount"});
+  }
+  try{
+    let r;
+    if(hasAmount){
+      r=await pool.query("UPDATE bookings SET status=$1,amount_jmd=$2 WHERE id=$3 RETURNING *",[status,amount,req.params.id]);
+    }else{
+      r=await pool.query("UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *",[status,req.params.id]);
+    }
+    if(!r.rowCount)return res.status(404).json({error:"Booking not found"});
+    res.json(r.rows[0])
+  }catch(e){
+    console.error("BOOKING_STATUS_UPDATE_ERROR",{code:e.code,message:e.message,detail:e.detail});
+    res.status(500).json({error:"Unable to update booking"})
+  }
 });
 app.post("/api/bookings",async(req,res)=>{
   const {service,customerName,phone,email,address,scheduledAt,notes}=req.body||{};
