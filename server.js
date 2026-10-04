@@ -23,7 +23,7 @@ app.use((req,res,next)=>{
 });
 app.use(express.static("public",{etag:false,lastModified:false}));
 app.get("/favicon.ico",(req,res)=>res.sendFile(require("path").join(__dirname,"public","icons","orca.svg")));
-app.get("/admin",(req,res)=>res.redirect(302,"/admin.html?v=b1908a64"));
+app.get("/admin",(req,res)=>res.redirect(302,"/admin.html?v=20261004-1508"));
 app.get("/creator",(req,res)=>res.sendFile(require("path").join(__dirname,"public","admin.html")));
 app.get("/install",(req,res)=>res.sendFile(require("path").join(__dirname,"public","install.html")));
 app.get("/staff",(req,res)=>res.sendFile(require("path").join(__dirname,"public","staff.html")));
@@ -242,8 +242,8 @@ app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
   if(!pool)return res.status(503).json({error:"Database is not configured"});
   const rawStatus=String(req.body.status||"").trim();
   const statusMap={new:"New",confirmed:"Confirmed",completed:"Completed",cancelled:"Cancelled"};
-  const status=statusMap[rawStatus.toLowerCase()];
-  if(!status)return res.status(400).json({error:"Invalid status. Use New, Confirmed, Completed or Cancelled."});
+  const status=rawStatus?statusMap[rawStatus.toLowerCase()]:null;
+  if(rawStatus&&!status)return res.status(400).json({error:"Invalid status. Use Confirmed, Completed or Cancelled."});
   const hasAmount=Object.prototype.hasOwnProperty.call(req.body,"amountJmd");
   let amount;
   if(hasAmount){
@@ -252,10 +252,14 @@ app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
   }
   try{
     let r;
-    if(hasAmount){
+    if(hasAmount&&status){
       r=await pool.query("UPDATE bookings SET status=$1,amount_jmd=$2 WHERE id=$3 RETURNING *",[status,amount,req.params.id]);
-    }else{
+    }else if(hasAmount){
+      r=await pool.query("UPDATE bookings SET amount_jmd=$1 WHERE id=$2 RETURNING *",[amount,req.params.id]);
+    }else if(status){
       r=await pool.query("UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *",[status,req.params.id]);
+    }else{
+      return res.status(400).json({error:"Choose Confirmed, Completed or Cancelled."});
     }
     if(!r.rowCount)return res.status(404).json({error:"Booking not found"});
     res.json(r.rows[0])
