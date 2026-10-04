@@ -11,7 +11,12 @@ async function saveBooking(id){const amount=document.getElementById("amt"+id).va
 async function loadUsers(){const r=await fetch("/api/admin/users",{headers:headers()});if(!r.ok)return;const d=await r.json();document.getElementById("users").innerHTML=d.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.role)+'</td><td>'+new Date(u.created_at).toLocaleString()+'</td><td><button class="danger" onclick="deleteUser('+u.id+')">Delete</button></td></tr>').join("")}
 async function addUser(){const msg=document.getElementById("userMsg");const r=await fetch("/api/admin/users",{method:"POST",headers:{"Content-Type":"application/json",...headers()},body:JSON.stringify({username:document.getElementById("newUser").value,password:document.getElementById("newPw").value,role:document.getElementById("newRole").value})});const d=await r.json();msg.className=r.ok?"ok":"error";msg.textContent=r.ok?"Account created.":d.error;if(r.ok){document.getElementById("newUser").value="";document.getElementById("newPw").value="";loadUsers()}}
 async function deleteUser(id){if(!confirm("Delete this account?"))return;const r=await fetch("/api/admin/users/"+id,{method:"DELETE",headers:headers()});if(!r.ok){const d=await r.json();alert(d.error);return}loadUsers()}
-async function status(id,status){const r=await fetch("/api/bookings/"+id,{method:"PATCH",headers:{"Content-Type":"application/json",...headers()},body:JSON.stringify({status})});if(!r.ok){const d=await r.json().catch(()=>({}));alert(d.error||"Could not update status");return}loadBookings()}
+async function status(id,status){
+  const url=status==="Confirmed"?"/api/bookings/"+id+"/confirm":"/api/bookings/"+id;
+  const r=await fetch(url,{method:status==="Confirmed"?"POST":"PATCH",headers:{"Content-Type":"application/json",...headers()},body:status==="Confirmed"?null:JSON.stringify({status})});
+  if(!r.ok){const d=await r.json().catch(()=>({}));alert(d.error||"Could not update status");return}
+  loadBookings();
+}
 async function logout(call=true){if(call&&token)await fetch("/api/admin/logout",{method:"POST",headers:headers()}).catch(()=>{});localStorage.removeItem("orcaAdminToken");sessionStorage.removeItem("orcaOwner");token="";location.reload()}
 function sel(a,b){return a===b?"selected":""}function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
 async function init(){if(!token)return;const r=await fetch("/api/admin/me",{headers:headers()});if(!r.ok){logout(false);return}const u=await r.json();if(u.role==="owner")sessionStorage.setItem("orcaOwner","1");showDash(u);loadBookings()}init();
