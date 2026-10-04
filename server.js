@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(express.static("public"));
 app.get("/favicon.ico",(req,res)=>res.sendFile(require("path").join(__dirname,"public","icons","orca.svg")));
-app.get("/admin",(req,res)=>res.sendFile(require("path").join(__dirname,"public","admin.html")));
+app.get("/admin",(req,res)=>{res.set("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");res.sendFile(require("path").join(__dirname,"public","admin.html"));});
 app.get("/creator",(req,res)=>res.sendFile(require("path").join(__dirname,"public","admin.html")));
 app.get("/install",(req,res)=>res.sendFile(require("path").join(__dirname,"public","install.html")));
 app.get("/staff",(req,res)=>res.sendFile(require("path").join(__dirname,"public","staff.html")));
