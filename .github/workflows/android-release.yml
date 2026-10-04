@@ -37,19 +37,38 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify Capacitor toolchain
+        run: |
+          node --version
+          npm --version
+          npx cap --version
+          test -f capacitor.config.ts
+          test -d android-web
+
       - name: Add Android platform
         run: npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Decode Android signing keystore
-        env:
-          KS_B64: ${{ secrets.ORCA_KEYSTORE_BASE64 }}
+      - name: Verify Android project
         working-directory: android
         run: |
-          test -n "$KS_B64"
+          test -f gradlew
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Decode and validate Android signing keystore
+        env:
+          KS_B64: ${{ secrets.ORCA_KEYSTORE_BASE64 }}
+          KS_PASSWORD: ${{ secrets.ORCA_KEYSTORE_PASSWORD }}
+        working-directory: android
+        run: |
+          test -n "$KS_B64" || { echo "::error::ORCA_KEYSTORE_BASE64 is not configured"; exit 1; }
+          test -n "$KS_PASSWORD" || { echo "::error::ORCA_KEYSTORE_PASSWORD is not configured"; exit 1; }
           printf '%s' "$KS_B64" | base64 --decode > orca-release.keystore
+          test -s orca-release.keystore
+          keytool -list -keystore orca-release.keystore -storepass "$KS_PASSWORD" >/dev/null
 
       - name: Configure Android release signing
         env:
@@ -58,35 +77,37 @@ jobs:
           KEY_PASSWORD_VALUE: ${{ secrets.ORCA_KEY_PASSWORD }}
         working-directory: android
         run: |
-          test -n "$KS_PASSWORD"
-          test -n "$KEY_ALIAS_VALUE"
-          test -n "$KEY_PASSWORD_VALUE"
+          test -n "$KS_PASSWORD" || { echo "::error::ORCA_KEYSTORE_PASSWORD is not configured"; exit 1; }
+          test -n "$KEY_ALIAS_VALUE" || { echo "::error::ORCA_KEY_ALIAS is not configured"; exit 1; }
+          test -n "$KEY_PASSWORD_VALUE" || { echo "::error::ORCA_KEY_PASSWORD is not configured"; exit 1; }
           python3 - <<'PY'
           from pathlib import Path
           import re
           p = Path("app/build.gradle")
           s = p.read_text()
-          signing = '''    signingConfigs {
-          release {
-              storeFile file("orca-release.keystore")
-              storePassword System.getenv("KS_PASSWORD")
-              keyAlias System.getenv("KEY_ALIAS_VALUE")
-              keyPassword System.getenv("KEY_PASSWORD_VALUE")
-          }
-      }
-          '''
           if "signingConfigs {" not in s:
-              s = s.replace("android {", "android {\n" + signing, 1)
+              signing = '''
+    signingConfigs {
+        release {
+            storeFile file("orca-release.keystore")
+            storePassword System.getenv("KS_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS_VALUE")
+            keyPassword System.getenv("KEY_PASSWORD_VALUE")
+        }
+    }
+'''
+              s = s.replace("android {", "android {" + signing, 1)
           if "signingConfig signingConfigs.release" not in s:
               s, n = re.subn(
                   r'(buildTypes\s*\{\s*release\s*\{)',
-                  r'\1\n            signingConfig signingConfigs.release',
+                  r'\1\n        signingConfig signingConfigs.release',
                   s, count=1
               )
               if n != 1:
-                  raise SystemExit("Could not locate the Android release build type")
+                  raise SystemExit("Could not locate Android release build type")
           p.write_text(s)
           PY
+          grep -n "signingConfigs\|signingConfig signingConfigs.release" app/build.gradle
 
       - name: Build signed release AAB
         env:
@@ -94,7 +115,13 @@ jobs:
           KEY_ALIAS_VALUE: ${{ secrets.ORCA_KEY_ALIAS }}
           KEY_PASSWORD_VALUE: ${{ secrets.ORCA_KEY_PASSWORD }}
         working-directory: android
-        run: ./gradlew bundleRelease
+        run: ./gradlew bundleRelease --stacktrace --no-daemon
+
+      - name: Verify signed AAB
+        working-directory: android
+        run: |
+          test -s app/build/outputs/bundle/release/app-release.aab
+          ls -lh app/build/outputs/bundle/release/app-release.aab
 
       - name: Upload signed AAB
         uses: actions/upload-artifact@v4
