@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 app.use(express.static("public"));
 app.get("/favicon.ico",(req,res)=>res.sendFile(require("path").join(__dirname,"public","icons","orca.svg")));
-app.get("/admin",(req,res)=>{res.set("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");res.sendFile(require("path").join(__dirname,"public","admin.html"));});
+app.get("/admin",(req,res)=>res.redirect(302,"/admin.html?v=b1908a64"));
 app.get("/creator",(req,res)=>res.sendFile(require("path").join(__dirname,"public","admin.html")));
 app.get("/install",(req,res)=>res.sendFile(require("path").join(__dirname,"public","install.html")));
 app.get("/staff",(req,res)=>res.sendFile(require("path").join(__dirname,"public","staff.html")));
@@ -211,6 +211,23 @@ app.post("/api/bookings/:id/confirm",requireAdmin,async(req,res)=>{
   }catch(e){
     console.error("BOOKING_CONFIRM_ERROR",{code:e.code,message:e.message,detail:e.detail});
     res.status(500).json({error:"Unable to confirm booking"});
+  }
+});
+app.post("/api/bookings/:id/status",requireAdmin,async(req,res)=>{
+  if(!pool)return res.status(503).json({error:"Database is not configured"});
+  const raw=String(req.body.status||"").trim().toLowerCase();
+  const allowed={confirmed:"Confirmed",completed:"Completed",cancelled:"Cancelled"};
+  const status=allowed[raw];
+  if(!status)return res.status(400).json({error:"Choose Confirmed, Completed or Cancelled."});
+  try{
+    await ensureBookingsDb();
+    const r=await pool.query("UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *",[status,req.params.id]);
+    if(!r.rowCount)return res.status(404).json({error:"Booking not found"});
+    console.log("BOOKING_STATUS_UPDATED",{id:req.params.id,status});
+    res.json(r.rows[0]);
+  }catch(e){
+    console.error("BOOKING_STATUS_UPDATE_ERROR",{code:e.code,message:e.message,detail:e.detail});
+    res.status(500).json({error:"Unable to update booking status"});
   }
 });
 app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
