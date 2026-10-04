@@ -200,6 +200,19 @@ app.get("/api/bookings",requireAdmin,async(req,res)=>{
   try{await ensureDb();const r=await pool.query("SELECT * FROM bookings ORDER BY created_at DESC");res.json(r.rows)}
   catch(e){res.status(500).json({error:"Unable to load bookings"})}
 });
+app.post("/api/bookings/:id/confirm",requireAdmin,async(req,res)=>{
+  if(!pool)return res.status(503).json({error:"Database is not configured"});
+  try{
+    await ensureBookingsDb();
+    const r=await pool.query("UPDATE bookings SET status='Confirmed' WHERE id=$1 RETURNING *",[req.params.id]);
+    if(!r.rowCount)return res.status(404).json({error:"Booking not found"});
+    console.log("BOOKING_CONFIRMED",{id:req.params.id});
+    res.json(r.rows[0]);
+  }catch(e){
+    console.error("BOOKING_CONFIRM_ERROR",{code:e.code,message:e.message,detail:e.detail});
+    res.status(500).json({error:"Unable to confirm booking"});
+  }
+});
 app.patch("/api/bookings/:id",requireAdmin,async(req,res)=>{
   if(!pool)return res.status(503).json({error:"Database is not configured"});
   const rawStatus=String(req.body.status||"").trim();
