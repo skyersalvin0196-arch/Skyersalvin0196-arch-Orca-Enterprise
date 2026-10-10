@@ -87,17 +87,18 @@ jobs:
           p = Path("app/build.gradle")
           s = p.read_text()
           if "signingConfigs {" not in s:
-              signing = '''
-    signingConfigs {
-        release {
-            storeFile file("orca-release.keystore")
-            storePassword System.getenv("KS_PASSWORD")
-            keyAlias System.getenv("KEY_ALIAS_VALUE")
-            keyPassword System.getenv("KEY_PASSWORD_VALUE")
-        }
-    }
-'''
-              s = s.replace("android {", "android {" + signing, 1)
+              signing = "\\n".join([
+                  "    signingConfigs {",
+                  "        release {",
+                  '            storeFile file("orca-release.keystore")',
+                  '            storePassword System.getenv("KS_PASSWORD")',
+                  '            keyAlias System.getenv("KEY_ALIAS_VALUE")',
+                  '            keyPassword System.getenv("KEY_PASSWORD_VALUE")',
+                  "        }",
+                  "    }",
+                  ""
+              ])
+              s = s.replace("android {", "android {\\n" + signing, 1)
           if "signingConfig signingConfigs.release" not in s:
               s, n = re.subn(
                   r'(buildTypes\\s*\\{\\s*release\\s*\\{)',
