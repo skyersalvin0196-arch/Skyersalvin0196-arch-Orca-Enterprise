@@ -134,5 +134,9 @@ jobs:
 
       - name: Remove signing keystore
         if: always()
-        working-directory: android
-        run: rm -f orca-release.keystore
+        run: |
+          if [ -d android ]; then
+            rm -f android/orca-release.keystore
+          else
+            echo "Android directory was not created; nothing to clean up."
+          fi
