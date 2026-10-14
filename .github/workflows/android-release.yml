@@ -87,7 +87,7 @@ jobs:
           p = Path("app/build.gradle")
           s = p.read_text()
           if "signingConfigs {" not in s:
-              signing = "\\n".join([
+              signing = "\n".join([
                   "    signingConfigs {",
                   "        release {",
                   '            storeFile file("orca-release.keystore")',
@@ -98,11 +98,11 @@ jobs:
                   "    }",
                   ""
               ])
-              s = s.replace("android {", "android {\\n" + signing, 1)
+              s = s.replace("android {", "android {\n" + signing, 1)
           if "signingConfig signingConfigs.release" not in s:
               s, n = re.subn(
-                  r'(buildTypes\\s*\\{\\s*release\\s*\\{)',
-                  r'\\1\\n        signingConfig signingConfigs.release',
+                  r'(buildTypes\s*\{\s*release\s*\{)',
+                  r'\1\n        signingConfig signingConfigs.release',
                   s, count=1
               )
               if n != 1:
