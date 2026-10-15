@@ -31,14 +31,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verify Android SDK
-        run: |
-          echo "ANDROID_HOME=${ANDROID_HOME}"
-          test -x "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" || find "${ANDROID_HOME}/cmdline-tools" -name sdkmanager -type f
-          sdkmanager --version
-
       - name: Install Android SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
       - name: Install dependencies
         run: npm install
